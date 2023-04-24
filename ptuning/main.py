@@ -29,6 +29,7 @@ import jieba
 from rouge_chinese import Rouge
 from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 import torch
+import time
 
 import transformers
 from transformers import (
@@ -44,9 +45,13 @@ from transformers import (
 from trainer_seq2seq import Seq2SeqTrainer
 
 from arguments import ModelArguments, DataTrainingArguments
-
 logger = logging.getLogger(__name__)
 
+# os.environ["WANDB_DISABLED"] = "true"
+# print("os LOCAL_RANK", os.environ["LOCAL_RANK"])
+# if int(os.environ["LOCAL_RANK"]) % 2 == 1:
+#     print("sleep some time" )
+#     time.sleep(1)
 def main():
 
     parser = HfArgumentParser((ModelArguments, DataTrainingArguments, Seq2SeqTrainingArguments))
@@ -109,7 +114,7 @@ def main():
     config.pre_seq_len = model_args.pre_seq_len
     config.prefix_projection = model_args.prefix_projection
 
-    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, trust_remote_code=True, truncation_side="left")
 
     if model_args.ptuning_checkpoint is not None:
         # Evaluation
@@ -210,7 +215,8 @@ def main():
                 b_ids = tokenizer.encode(text=answer, add_special_tokens=False)
 
                 if len(a_ids) > data_args.max_source_length - 1:
-                    a_ids = a_ids[: data_args.max_source_length - 1]
+                    #a_ids = a_ids[: data_args.max_source_length - 1]
+                    a_ids = a_ids[-data_args.max_source_length + 1 :]
 
                 if len(b_ids) > data_args.max_target_length - 2:
                     b_ids = b_ids[: data_args.max_target_length - 2]
