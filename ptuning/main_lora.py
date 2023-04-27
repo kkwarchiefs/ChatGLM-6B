@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
 from peft import get_peft_model, LoraConfig, TaskType
 
 
-# os.environ["WANDB_DISABLED"] = "true"
+os.environ["WANDB_DISABLED"] = "true"
 # print("os LOCAL_RANK", os.environ["LOCAL_RANK"])
 # if int(os.environ["LOCAL_RANK"]) % 2 == 1:
 #     print("sleep some time" )
@@ -136,8 +136,23 @@ def main():
         model = model.quantize(model_args.quantization_bit)
     if model_args.pre_seq_len is not None:
         # P-tuning v2
-        model = model.half()
+        peft_config = LoraConfig(
+            task_type=TaskType.CAUSAL_LM,
+            inference_mode=False,
+            r=64,
+            lora_alpha=32,
+            lora_dropout=0.1,
+            target_modules=["query_key_value", "dense", "dense_h_to_4h", "dense_4h_to_h"],
+        )
+
+        model = get_peft_model(model, peft_config)
+        model.print_trainable_parameters()
         model.transformer.prefix_encoder.float()
+        for name, param in model.named_parameters():
+            if 'prefix_encoder' in name:
+                param.requires_grad = True
+            if param.requires_grad:
+                print(name)
     else:
         # Finetune
         peft_config = LoraConfig(
