@@ -328,6 +328,9 @@ def attention_fn(
     # change view [b * np, sq, sk]
     attention_probs = attention_probs.view(output_size[0] * output_size[1], output_size[2], -1)
 
+    # add dropout
+    attention_probs = self.attention_dropout(attention_probs)
+
     # matmul: [b * np, sq, hn]
     context_layer = torch.bmm(attention_probs, value_layer.transpose(0, 1))
 
@@ -400,6 +403,11 @@ class SelfAttention(torch.nn.Module):
             bias=bias,
             dtype=params_dtype,
         )
+
+        self.attention_dropout = torch.nn.Dropout(0.1)
+
+        self.output_dropout = torch.nn.Dropout(0.1)
+
 
     @staticmethod
     def attention_mask_func(attention_scores, attention_mask):
@@ -484,6 +492,7 @@ class SelfAttention(torch.nn.Module):
         )
 
         output = self.dense(context_layer)
+        output = self.output_dropout(output)
 
         outputs = (output, present)
 
@@ -536,6 +545,9 @@ class GLU(torch.nn.Module):
             dtype=params_dtype,
         )
 
+        self.dropout = torch.nn.Dropout(0.1)
+
+
     def forward(self, hidden_states):
         """
         hidden_states: [seq_len, batch, hidden_size]
@@ -547,6 +559,7 @@ class GLU(torch.nn.Module):
         intermediate_parallel = self.activation_func(intermediate_parallel)
 
         output = self.dense_4h_to_h(intermediate_parallel)
+        output = self.dropout(output)
 
         return output
 
@@ -824,6 +837,8 @@ class ChatGLMModel(ChatGLMPreTrainedModel):
             dtype=self.params_dtype
         )
         self.gradient_checkpointing = False
+        self.embedding_dropout = torch.nn.Dropout(0.1)
+
 
         def get_layer(layer_id):
             return GLMBlock(
@@ -918,7 +933,7 @@ class ChatGLMModel(ChatGLMPreTrainedModel):
         elif input_ids is not None:
             batch_size, seq_length = input_ids.shape[:2]
         elif inputs_embeds is not None:
-            batch_size, seq_length, _ = inputs_embeds.shape[:2]
+            batch_size, seq_length = inputs_embeds.shape[:2]
         else:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
 
@@ -965,6 +980,7 @@ class ChatGLMModel(ChatGLMPreTrainedModel):
 
         # [seq_len, batch, hidden_size]
         hidden_states = inputs_embeds.transpose(0, 1)
+        hidden_states = self.embedding_dropout(hidden_states)
 
         presents = () if use_cache else None
         all_self_attentions = () if output_attentions else None
@@ -972,9 +988,8 @@ class ChatGLMModel(ChatGLMPreTrainedModel):
 
         if attention_mask is None:
             attention_mask = torch.zeros(1, 1, device=input_ids.device).bool()
-
         else:
-            attention_mask = attention_mask.to(input_ids.device)
+            attention_mask = attention_mask.to(hidden_states.device)
 
         for i, layer in enumerate(self.layers):
 
@@ -1282,15 +1297,9 @@ class ChatGLMForConditionalGeneration(ChatGLMPreTrainedModel):
                 prompt += "[Round {}]\n问：{}\n答：{}\n".format(i, old_query, response)
             prompt += "[Round {}]\n问：{}\n答：".format(len(history), query)
         inputs = tokenizer([prompt], return_tensors="pt")
-        #inputs = tokenizer([prompt], max_length=1024, truncation=True, return_tensors="pt")
         inputs = inputs.to(self.device)
         outputs = self.generate(**inputs, **gen_kwargs)
-        #outputs = outputs.tolist()[0][len(inputs["input_ids"][0]):]
-        outputs = outputs.tolist()[0]
-        response = tokenizer.decode(outputs)
-        response = self.process_response(response)
-        print (response)
-        outputs = outputs[len(inputs["input_ids"][0]):]
+        outputs = outputs.tolist()[0][len(inputs["input_ids"][0]):]
         response = tokenizer.decode(outputs)
         response = self.process_response(response)
         history = history + [(query, response)]
