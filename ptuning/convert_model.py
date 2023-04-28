@@ -45,9 +45,9 @@ def covert_onnx():
     save_model(new_onnx_model, out + '/model_fp16.onnx')
 
 def merge_lora():
-    config = AutoConfig.from_pretrained("/search/ai/pretrain_models/chatglm-6b/", trust_remote_code=True)
+    config = AutoConfig.from_pretrained("/search/ai/pretrain_models/chatglm-6b/", trust_remote_code=True, pre_seq_len=128)
     tokenizer = AutoTokenizer.from_pretrained("/search/ai/pretrain_models/chatglm-6b/", trust_remote_code=True)
-    model = AutoModel.from_pretrained(sys.argv[1], trust_remote_code=True)
+    model = AutoModel.from_pretrained(sys.argv[1], config=config, trust_remote_code=True)
     peft_config = LoraConfig(
         task_type=TaskType.CAUSAL_LM,
         inference_mode=False,
@@ -58,11 +58,11 @@ def merge_lora():
     )
 
     model = get_peft_model(model, peft_config)
-    model_dict = torch.load(os.path.join(sys.argv[1], 'pytorch_model.bin'))
+    model_dict = torch.load(os.path.join(sys.argv[1], 'pytorch_model.bin'), map_location="cpu")
     new_model_dict = {}
     for key, value in model_dict.items():
-        if 'lora_' in key:
-            key = key.replace('.weight', '.default.weight')
+        # if 'lora_' in key:
+        #     key = key.replace('.weight', '.default.weight')
         new_model_dict[key] = value
     model.load_state_dict(new_model_dict, strict=True)
     model = model.merge_and_unload()
@@ -84,4 +84,4 @@ def merge_lora():
     tokenizer.save_pretrained(sys.argv[2])
 
 if __name__ == "__main__":
-    convert_model()
+    merge_lora()
