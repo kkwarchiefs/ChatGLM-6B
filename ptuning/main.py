@@ -47,7 +47,7 @@ from trainer_seq2seq import Seq2SeqTrainer
 from arguments import ModelArguments, DataTrainingArguments
 logger = logging.getLogger(__name__)
 
-# os.environ["WANDB_DISABLED"] = "true"
+os.environ["WANDB_DISABLED"] = "true"
 # print("os LOCAL_RANK", os.environ["LOCAL_RANK"])
 # if int(os.environ["LOCAL_RANK"]) % 2 == 1:
 #     print("sleep some time" )

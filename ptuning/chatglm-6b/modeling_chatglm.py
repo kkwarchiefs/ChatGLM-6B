@@ -189,6 +189,7 @@ class RotaryEmbedding(torch.nn.Module):
             self.cos_cached = None
             self.sin_cached = None
         self.precision = precision
+        self.scale = 1 / 4
 
     def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys,
                               error_msgs):
@@ -200,6 +201,7 @@ class RotaryEmbedding(torch.nn.Module):
         if self.max_seq_len_cached is None or (seq_len > self.max_seq_len_cached):
             self.max_seq_len_cached = None if self.learnable else seq_len
             t = torch.arange(seq_len, device=x.device, dtype=self.inv_freq.dtype)
+            t = t // 4
             freqs = torch.einsum('i,j->ij', t, self.inv_freq)
             # Different from paper, but it uses a different permutation in order to obtain the same calculation
             emb = torch.cat((freqs, freqs), dim=-1).to(x.device)
@@ -328,9 +330,6 @@ def attention_fn(
     # change view [b * np, sq, sk]
     attention_probs = attention_probs.view(output_size[0] * output_size[1], output_size[2], -1)
 
-    # add dropout
-    attention_probs = self.attention_dropout(attention_probs)
-
     # matmul: [b * np, sq, hn]
     context_layer = torch.bmm(attention_probs, value_layer.transpose(0, 1))
 
@@ -403,11 +402,6 @@ class SelfAttention(torch.nn.Module):
             bias=bias,
             dtype=params_dtype,
         )
-
-        self.attention_dropout = torch.nn.Dropout(0.1)
-
-        self.output_dropout = torch.nn.Dropout(0.1)
-
 
     @staticmethod
     def attention_mask_func(attention_scores, attention_mask):
@@ -492,7 +486,6 @@ class SelfAttention(torch.nn.Module):
         )
 
         output = self.dense(context_layer)
-        output = self.output_dropout(output)
 
         outputs = (output, present)
 
@@ -545,9 +538,6 @@ class GLU(torch.nn.Module):
             dtype=params_dtype,
         )
 
-        self.dropout = torch.nn.Dropout(0.1)
-
-
     def forward(self, hidden_states):
         """
         hidden_states: [seq_len, batch, hidden_size]
@@ -559,7 +549,6 @@ class GLU(torch.nn.Module):
         intermediate_parallel = self.activation_func(intermediate_parallel)
 
         output = self.dense_4h_to_h(intermediate_parallel)
-        output = self.dropout(output)
 
         return output
 
@@ -721,7 +710,7 @@ class ChatGLMPreTrainedModel(PreTrainedModel):
             position_ids = torch.arange(seq_length, dtype=torch.long, device=device).unsqueeze(0).repeat(batch_size, 1)
             for i, context_length in enumerate(context_lengths):
                 if not use_gmasks[i]:
-                    position_ids[context_length:] = mask_positions[i]
+                    position_ids[i, context_length:] = mask_positions[i]
 
         return position_ids
 
@@ -837,8 +826,6 @@ class ChatGLMModel(ChatGLMPreTrainedModel):
             dtype=self.params_dtype
         )
         self.gradient_checkpointing = False
-        self.embedding_dropout = torch.nn.Dropout(0.1)
-
 
         def get_layer(layer_id):
             return GLMBlock(
@@ -980,7 +967,6 @@ class ChatGLMModel(ChatGLMPreTrainedModel):
 
         # [seq_len, batch, hidden_size]
         hidden_states = inputs_embeds.transpose(0, 1)
-        hidden_states = self.embedding_dropout(hidden_states)
 
         presents = () if use_cache else None
         all_self_attentions = () if output_attentions else None

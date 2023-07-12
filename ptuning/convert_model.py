@@ -45,8 +45,8 @@ def covert_onnx():
     save_model(new_onnx_model, out + '/model_fp16.onnx')
 
 def merge_lora():
-    config = AutoConfig.from_pretrained("/search/ai/pretrain_models/chatglm-6b/", trust_remote_code=True, pre_seq_len=128)
-    tokenizer = AutoTokenizer.from_pretrained("/search/ai/pretrain_models/chatglm-6b/", trust_remote_code=True)
+    config = AutoConfig.from_pretrained("/search/ai/pretrain_models/chatglm-6b-1.1/snapshots/a10da4c68b5d616030d3531fc37a13bb44ea814d/", trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained("/search/ai/pretrain_models/chatglm-6b-1.1/snapshots/a10da4c68b5d616030d3531fc37a13bb44ea814d/", trust_remote_code=True)
     model = AutoModel.from_pretrained(sys.argv[1], config=config, trust_remote_code=True)
     peft_config = LoraConfig(
         task_type=TaskType.CAUSAL_LM,
@@ -63,6 +63,8 @@ def merge_lora():
     for key, value in model_dict.items():
         # if 'lora_' in key:
         #     key = key.replace('.weight', '.default.weight')
+        if "prefix_" in key:
+            continue
         new_model_dict[key] = value
     model.load_state_dict(new_model_dict, strict=True)
     model = model.merge_and_unload()
