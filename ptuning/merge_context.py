@@ -99,9 +99,7 @@ def find_long():
                     "summary": query2res[q].strip()
                 }
                 print(json.dumps(ins, ensure_ascii=False))
-
-if __name__ == "__main__":
-    # merge()
+def cal_len():
     from transformers import AutoTokenizer, AutoModel
     tokenizer = AutoTokenizer.from_pretrained("/search/ai/pretrain_models/chatglm-6b-1.1/snapshots/a10da4c68b5d616030d3531fc37a13bb44ea814d", trust_remote_code=True)
     for line in sys.stdin:
@@ -109,3 +107,19 @@ if __name__ == "__main__":
         if len(tokenizer(ins['content'])['input_ids']) < 4096:
             if type(ins['content']) == str and type(ins['content']) == str:
                 print(line.strip())
+
+if __name__ == "__main__":
+    # merge()
+    from transformers import AutoTokenizer, AutoModel
+    tokenizer = AutoTokenizer.from_pretrained("/cfs/cfs-g22qkwzd/jamsluo/chatpdf/models/chatglm-6b-1.1/", trust_remote_code=True)
+    for line in sys.stdin:
+        ins = json.loads(line)
+        if ins['length_chat'] > 4096:
+            continue
+        if len(tokenizer(ins['response'])['input_ids']) > 512:
+            continue
+        res = {
+            'content': ins["content"].replace('\n', '<n>'),
+            'summary': ins['response'].replace('\n', '<n>')
+        }
+        print(json.dumps(res, ensure_ascii=False))
