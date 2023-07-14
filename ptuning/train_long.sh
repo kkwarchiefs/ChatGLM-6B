@@ -1,4 +1,5 @@
-LR=5e-5
+LR=1e-4
+PRE_SEQ_LEN=128
 DATESTR=$(date +"%m-%d-%H-%M")
 MASTER_PORT=$(shuf -n 1 -i 10000-65535)
 
@@ -17,7 +18,7 @@ nohup  deepspeed --num_gpus=8 --master_port $MASTER_PORT main.py \
     --max_target_length 512 \
     --per_device_train_batch_size 3 \
     --per_device_eval_batch_size 1 \
-    --gradient_accumulation_steps 4 \
+    --gradient_accumulation_steps 3 \
     --predict_with_generate \
     --max_steps 2000 \
     --logging_steps 10 \

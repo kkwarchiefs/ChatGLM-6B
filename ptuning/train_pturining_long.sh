@@ -11,7 +11,7 @@ nohup python3 -m torch.distributed.launch --nproc_per_node 8 main.py \
     --prompt_column content \
     --response_column summary \
     --model_name_or_path /search/ai/pretrain_models/chatglm-6b-1.1/snapshots/a10da4c68b5d616030d3531fc37a13bb44ea814d/ \
-    --output_dir ./output/mrc-8192-explain-$PRE_SEQ_LEN-$LR-$DATESTR \
+    --output_dir ./output/mrc-409-explain-$PRE_SEQ_LEN-$LR-$DATESTR \
     --overwrite_output_dir \
     --max_source_length 4096 \
     --max_target_length 512 \
